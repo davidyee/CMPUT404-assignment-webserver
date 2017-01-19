@@ -27,7 +27,11 @@ Further documentatation used to implement server.py:
 
 * HTTP response format: https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html
 * File open: https://docs.python.org/2/library/functions.html#open
-* File readline: https://docs.python.org/2/library/io.html#io.TextIOBase.readline
+* File readline: https://docs.python.org/2/library/stdtypes.html#file.readlines
 * String join: https://docs.python.org/2/library/string.html#string.join
 * Path manipulation: https://docs.python.org/2/library/os.path.html
 * URL parsing: https://docs.python.org/2/library/urlparse.html
+* Jailed directory traversal inspired by code written by 
+  Jeff Terrace (http://stackoverflow.com/users/624900/jterrace) on Stack 
+  Overflow (http://stackoverflow.com/a/6803714/2557554) and 
+  licensed under CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/)
