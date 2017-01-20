@@ -1,6 +1,7 @@
 #  coding: utf-8 
 import SocketServer
 import os
+import mimetypes
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos, David Yee
 # 
@@ -73,11 +74,9 @@ class MyWebServer(SocketServer.BaseRequestHandler):
                     ext = os.path.splitext(file_abs_path)[1]
                     file = open(file_abs_path)
                     
-                    content_type = None
-                    if ext == ".css":
-                        content_type = "text/css"
-                    else:
-                        content_type = "text/html"
+                    content_type = mimetypes.guess_type(file.name)[0]
+                    if content_type is None:
+                        content_type = "application/octet-stream"
     
                     response = responses[200] + content_type_header.format(content_type)
                     
