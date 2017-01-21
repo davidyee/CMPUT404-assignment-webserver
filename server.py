@@ -2,6 +2,7 @@
 import SocketServer
 import os
 import mimetypes
+import errno
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos, David Yee
 # 
@@ -31,10 +32,9 @@ import mimetypes
 responses = {
     200 : "HTTP/1.1 200 OK\r\n",
     404 : "HTTP/1.1 404 Not Found\r\n",
-    405 : "HTTP/1.1 405 Method Not Allowed\r\n"
+    405 : "HTTP/1.1 405 Method Not Allowed\r\n",
+    500 : "HTTP/1.1 500 Internal Server Error\r\n"
 }
-
-content_type_header = "Content-Type: {0}; charset=utf-8\r\n\r\n"
 
 root_uri = "www/"
 root_abs_path = os.path.abspath(os.path.join(root_uri, os.curdir))
@@ -52,42 +52,72 @@ class MyWebServer(SocketServer.BaseRequestHandler):
         else:
             self.request.sendall(responses[405])
     
+    """
+    Generate the response string to return to the client.
+    
+    Do not provide the "Content-Length" header as it will be determined 
+    by this function.
+    """
+    def generate_response(self, status, file_abs_path=None):
+        response_headers = ""
+        content = ""
+        length = 0
+        
+        if file_abs_path is not None:
+            try:
+                ext = os.path.splitext(file_abs_path)[1]
+                file = open(file_abs_path)
+                
+                content_type = mimetypes.guess_type(file.name)[0]
+                if content_type is None:
+                    content_type = "application/octet-stream"
+        
+                status = 200
+                response_headers += "Content-Type: {0}; charset=utf-8\r\n".format(content_type)
+                
+                # Output content of file into the response
+                content = "".join(file.readlines())
+                length = len(content)
+            except IOError, e: # Reset all
+                if e.errno == errno.ENOENT: # File not found?
+                    status = 404
+                else: # Something catastrophic happened!
+                    status = 500
+                    
+                response_headers = ""
+                length = 0
+                content = ""
+        
+        """ 
+        Include the "Content-Length" header if applicable as defined by:
+        https://www.w3.org/Protocols/HTTP/1.0/draft-ietf-http-spec.html#Entity-Body
+        https://tools.ietf.org/html/rfc2616#section-14.13
+        https://tools.ietf.org/html/rfc2616#section-4.4
+        
+        This header is not necessary for 1xx, 204, or 304 responses. 
+        """
+        if not((status >= 100 and status < 200) or status == 204 or status == 304):
+            response_headers += "Content-Length: {0}\r\n".format(length)
+        
+        return responses[status] + response_headers + "\r\n" + content
+    
     def handle_get(self, url):
         file_abs_path = os.path.normpath(
             os.path.abspath(root_abs_path + url)
         )
         
+        response = ""
         if self.is_jailed(file_abs_path):
             if os.path.isdir(file_abs_path):
-                try:
-                    file = open(file_abs_path + "/index.html")
-                    response = responses[200] + content_type_header.format("text/html")
-                    
-                    # Output content of file into the response
-                    response += "".join(file.readlines())
-                    
-                    self.request.sendall(response)
-                except IOError:
-                    self.request.sendall(responses[404])
+                response = self.generate_response(200, os.path.join(file_abs_path, "index.html"))
+            elif os.path.isfile(file_abs_path):
+                response = self.generate_response(200, file_abs_path)
             else:
-                try:
-                    ext = os.path.splitext(file_abs_path)[1]
-                    file = open(file_abs_path)
-                    
-                    content_type = mimetypes.guess_type(file.name)[0]
-                    if content_type is None:
-                        content_type = "application/octet-stream"
-    
-                    response = responses[200] + content_type_header.format(content_type)
-                    
-                    # Output content of file into the response
-                    response += "".join(file.readlines())
-                    
-                    self.request.sendall(response)
-                except IOError:
-                    self.request.sendall(responses[404])
+                response = self.generate_response(404)
         else:
-            self.request.sendall(responses[404])
+            response = self.generate_response(404)
+        
+        self.request.sendall(response)
     
     """
     Determines if the given file is permissible for retrieval. Only files that 
