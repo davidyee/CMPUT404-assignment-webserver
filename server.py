@@ -1,6 +1,7 @@
 #  coding: utf-8 
 import SocketServer
 import os
+import posixpath
 import mimetypes
 import errno
 
@@ -31,6 +32,7 @@ import errno
 
 responses = {
     200 : "HTTP/1.1 200 OK\r\n",
+    302 : "HTTP/1.1 302 Found\r\n",
     404 : "HTTP/1.1 404 Not Found\r\n",
     405 : "HTTP/1.1 405 Method Not Allowed\r\n",
     500 : "HTTP/1.1 500 Internal Server Error\r\n"
@@ -40,17 +42,20 @@ root_uri = "www/"
 root_abs_path = os.path.abspath(os.path.join(root_uri, os.curdir))
 
 class MyWebServer(SocketServer.BaseRequestHandler):
+    http_host = None
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        request = self.data.split()
-        http_verb = request[0] # GET, POST, PUT, etc.
-        http_path = request[1] # Requested path (ie: /)
-        
-        if http_verb == "GET":
-            self.handle_get(http_path)
-        else:
-            self.request.sendall(responses[405])
+        if self.data:
+            request_str = self.data.split()
+            http_verb = request_str[0] # GET, POST, PUT, etc.
+            http_path = request_str[1] # Requested path (ie: /)
+            self.http_host = request_str[request_str.index("Host:") + 1]
+            
+            if http_verb == "GET":
+                self.handle_get(http_path)
+            else:
+                self.request.sendall(responses[405])
     
     """
     Generate the response string to return to the client.
@@ -63,7 +68,10 @@ class MyWebServer(SocketServer.BaseRequestHandler):
         content = ""
         length = 0
         
-        if file_abs_path is not None:
+        if status >= 300 and status < 400:
+            # Do not attempt to open any files for redirections
+            response_headers += "Location: http://{0}\r\n".format(file_abs_path)
+        elif file_abs_path is not None:
             try:
                 ext = os.path.splitext(file_abs_path)[1]
                 file = open(file_abs_path)
@@ -109,7 +117,10 @@ class MyWebServer(SocketServer.BaseRequestHandler):
         response = ""
         if self.is_jailed(file_abs_path):
             if os.path.isdir(file_abs_path):
-                response = self.generate_response(200, os.path.join(file_abs_path, "index.html"))
+                if not (url.endswith("/") or url.endswith("\\")):
+                    response = self.generate_response(302, posixpath.join(posixpath.normpath(self.http_host + url), ""))
+                else:
+                    response = self.generate_response(200, os.path.join(file_abs_path, "index.html"))
             elif os.path.isfile(file_abs_path):
                 response = self.generate_response(200, file_abs_path)
             else:
