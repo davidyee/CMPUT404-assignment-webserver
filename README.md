@@ -35,3 +35,4 @@ Further documentatation used to implement server.py:
   Jeff Terrace (http://stackoverflow.com/users/624900/jterrace) on Stack 
   Overflow (http://stackoverflow.com/a/6803714/2557554) and 
   licensed under CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/)
+* Mimetype guessing: https://docs.python.org/2/library/mimetypes.html
